@@ -8,8 +8,15 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
+// Основные методы ORM: Create, Read, Update, Delete
 func getCalculation(c echo.Context) error {
-	return c.JSON(http.StatusOK, Calculations)
+	var calculations []Calculation
+
+	if err := db.Find(&calculations).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Could not get calculations"})
+	}
+
+	return c.JSON(http.StatusOK, calculations)
 }
 
 func postCalculations(c echo.Context) error {
@@ -28,7 +35,11 @@ func postCalculations(c echo.Context) error {
 		Expression: req.Expression,
 		Result:     result,
 	}
-	Calculations = append(Calculations, calc)
+	if err := db.Create(&calc).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Could not add calculations"})
+	}
+	db.Create(calc)
+
 	return c.JSON(http.StatusCreated, calc)
 }
 
@@ -45,30 +56,37 @@ func patchCalculations(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid expression"})
 	}
 
-	for i, Calculation := range Calculations {
-		if Calculation.ID == id {
-			Calculations[i].Expression = req.Expression
-			Calculations[i].Result = result
-			return c.JSON(http.StatusOK, Calculations[i])
-		}
+	var calc Calculation
+	if err := db.Find(&calc, "id = ?", id).Error; err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Calculation not find expression!"})
 	}
-	return c.JSON(http.StatusBadRequest, map[string]string{"error": "Calculation not found!"})
+
+	calc.Expression = req.Expression
+	calc.Result = result
+
+	if err := db.Save(&calc).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Could not update calculations"})
+	}
+
+	return c.JSON(http.StatusOK, calc)
 }
 
 func deleteCalculations(c echo.Context) error {
 	id := c.Param("id")
 
-	for i, calc := range Calculations {
-		if calc.ID == id {
-			Calculations = append(Calculations[:i], Calculations[i+1:]...)
-			return c.JSON(http.StatusOK, map[string]string{"message": "Deleted"})
-		}
+	result := db.Delete(&Calculation{}, "id = ?", id)
+	if result.Error != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Could not delete calculations",
+		})
 	}
 
-	return c.JSON(http.StatusNotFound, map[string]string{"error": "Calculation not found!"})
+	return c.NoContent(http.StatusNoContent)
 }
 
 func main() {
+	InitDB()
+
 	e := echo.New()
 
 	e.Use(middleware.CORS()) //запрещает фронтенду ходить в другой backend без разрешения

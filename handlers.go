@@ -8,7 +8,7 @@ import (
 
 // метаданные для полей структуры соотношение названий в коде и в JSON`...`
 type Calculation struct {
-	ID         string `json:"id"`
+	ID         string `gorm:"primaryKey" json:"id"`
 	Expression string `json:"expression"`
 	Result     string `json:"result"`
 }
@@ -16,9 +16,6 @@ type Calculation struct {
 type CalculationRequest struct {
 	Expression string `json:"expression"`
 }
-
-// динамический массив(слайс) структур Calculation
-var Calculations = []Calculation{}
 
 func CalculateExpression(expression string) (string, error) {
 	//проверяем, что можно привести к мат. выражению
